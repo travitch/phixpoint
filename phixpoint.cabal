@@ -13,8 +13,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules: Phixpoint.ValueContext
-                   Phixpoint.Domain
+  exposed-modules: Phixpoint.Domain
                    Phixpoint.FlowGraph
                    Phixpoint.Iteration
                    Phixpoint.Worklist
