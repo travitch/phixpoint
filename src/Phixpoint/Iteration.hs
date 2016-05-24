@@ -13,17 +13,25 @@ import Phixpoint.Domain
 import Phixpoint.FlowGraph
 import qualified Phixpoint.Worklist as W
 
-data Result n d = Result !(M.Map n d)
+data Result n' d = Result !(M.Map n' d)
 
-lookupAbstractValue :: (Ord n) => Result n d -> n -> Maybe d
+lookupAbstractValue :: (Ord n') => Result n' d -> n' -> Maybe d
 lookupAbstractValue (Result r) n = M.lookup n r
 
-data Interpretation n d =
-  Interpretation { iTransfer :: n -> d -> d
+-- | An interpretation of a flow graph with nodes of type @n@ in
+-- domain @d@.  The @n'@ parameter is a projection from @n@ that is
+-- used to index the result map.
+--
+-- This is a little baroque, but it allows the CFG nodes to be a
+-- different type that is efficient for traversal, but also allow @n'@
+-- to be more efficient for result lookup later.
+data Interpretation n n' d =
+  Interpretation { iTransfer :: n' -> d -> d
+                 , iProject :: n -> n'
                  }
 
 -- | Find the fixpoint of an abstract 'Interpretation' of a 'FlowGraph'
-fixpoint :: (Ord n, Eq d) => Domain d -> Interpretation n d -> FlowGraph n -> Result n d
+fixpoint :: (Ord n, Ord n', Eq d) => Domain d -> Interpretation n n' d -> FlowGraph n -> Result n' d
 fixpoint d i g = Result (go wl0 abst0)
   where
     wl0 = W.addWork W.empty (fgEntry g)
@@ -41,21 +49,21 @@ fixpoint d i g = Result (go wl0 abst0)
             in go wl'' abst'
       | otherwise = abst
 
-computeAbstraction :: (Ord n, Eq d)
+computeAbstraction :: (Ord n', Eq d)
                    => Domain d
-                   -> Interpretation n d
+                   -> Interpretation n n' d
                    -> FlowGraph n
                    -> n
-                   -> M.Map n d
-                   -> Maybe (M.Map n d)
+                   -> M.Map n' d
+                   -> Maybe (M.Map n' d)
 computeAbstraction d i g n abst
   | curAbs == newAbs = Nothing
-  | otherwise = Just (M.insert n newAbs abst)
+  | otherwise = Just (M.insert (iProject i n) newAbs abst)
   where
-    curAbs = lookupCurrentAbstraction d abst n
-    predAs = map (lookupCurrentAbstraction d abst) (fgPredecessors g n)
+    curAbs = lookupCurrentAbstraction d abst (iProject i n)
+    predAs = map (lookupCurrentAbstraction d abst . iProject i) (fgPredecessors g n)
     inputA = F.foldl' (domLub d) (domTop d) predAs
-    newAbs = iTransfer i n inputA
+    newAbs = iTransfer i (iProject i n) inputA
 
-lookupCurrentAbstraction :: (Ord n) => Domain d -> M.Map n d -> n -> d
+lookupCurrentAbstraction :: (Ord n') => Domain d -> M.Map n' d -> n' -> d
 lookupCurrentAbstraction d m n = M.findWithDefault (domTop d) n m
