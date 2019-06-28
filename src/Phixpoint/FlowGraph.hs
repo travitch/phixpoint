@@ -16,6 +16,7 @@ data FlowGraph n =
   FlowGraph { fgEntry :: n
             , fgSuccessors :: n -> [n]
             , fgPredecessors :: n -> [n]
+            , fgExits :: [n]
             }
 
 
